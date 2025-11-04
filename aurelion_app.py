@@ -161,7 +161,7 @@ if section == "Temas":
             """
             **Problema:** La tienda no tiene visibilidad clara sobre la **frecuencia de compra**, **antigüedad** y **actividad** de los clientes.
 
-            **Solución propuesta:** Construir indicadores de **frecuencia de compra**, **recencia** (tiempo desde la última compra) y **monetización** (importe total), así como segmentaciones de clientes **activos / inactivos / nuevos**.
+            **Solución propuesta:** Construir indicadores de **frecuencia de compra**, **recencia** (tiempo desde la última compra) y **monetización** (importe total).
 
             **Posible aplicación:** Implementar campañas de **fidelización** y **promociones personalizadas** (descuentos, cupones, puntos) enfocadas en clientes con alta probabilidad de recompra o en riesgo de abandono.
             """

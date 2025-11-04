@@ -26,6 +26,7 @@ from typing import Dict
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
+import textwrap as _tw
 
 # Configuración de la página
 st.set_page_config(
@@ -1474,14 +1475,27 @@ if section == "RFM (Segmentación clientes)":
         )
         
     # ================================
-    # 📘 CONCLUSIÓN Y PROPUESTA (Versión destacada)
+    # 📘 CONCLUSIÓN Y PROPUESTA
     # ================================
-    
+    st.markdown("---")
+    st.markdown("## 🧭 Conclusión y propuesta")
+
+    st.markdown(
+        """
+    El análisis **RFM** permitió identificar distintos perfiles de clientes según su **frecuencia**, **recencia** y **gasto**.  
+    Los segmentos **🏆 Champions** y **💎 Leales** deben ser el foco de **fidelización**, mientras que los **🌙 En Riesgo** y **💤 Dormidos** requieren **campañas de reactivación personalizadas**.
+
+    Se detectó además un volumen relevante de **clientes sin actividad**, lo que representa una oportunidad estratégica para **reconectarlos mediante incentivos de retorno**, como **descuentos por reactivación**, **cupones de bienvenida** o **beneficios por recompra**.
+
+    En conjunto, los resultados respaldan la aplicación de **programas de fidelización y promociones segmentadas** que fortalezcan la **retención** y **reactiven el vínculo** con clientes inactivos.
+        """
+    )
+
 
 # ================================
 # SPRINT 2 — Sección: Resumen Sprint 2
 # ================================
-import textwrap as _tw
+
 
 html_resumen_sprint2 = _tw.dedent("""
 <div style="

@@ -49,7 +49,7 @@ with col_logo:
 st.markdown("<hr>", unsafe_allow_html=True)
 st.markdown(
     """
-    <h2 style="margin:6px 0 0 6px; opacity:.9; color:#73FF86">Comportamiento de clientes y métodos de pago</h2>
+    <h2 style="margin:6px 0 0 6px; opacity:.9; color:#73FF86">Comportamiento de clientes</h2>
     """,
     unsafe_allow_html=True
 )

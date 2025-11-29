@@ -27,6 +27,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import textwrap as _tw
+#Nuevo para ML
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+
 
 # Configuración de la página
 st.set_page_config(
@@ -88,8 +93,50 @@ def schema_table(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame({
         "columna": df.columns,
         "dtype_pandas": [str(df[c].dtype) for c in df.columns],
-        "escala_aprox": [dtype_to_scale(str(df[c].dtype), c) for c in df.columns]
-    })
+        "escala_aprox": [dtype_to_scale(str(df[c].dtype), c) for c in df.columns]    
+})
+    
+# NUEVO PARA ML
+def preparar_dataset_ventas_diarias(ventas: pd.DataFrame,
+                                    detalle_ventas: pd.DataFrame) -> pd.DataFrame:
+    """
+    Construye un dataset agregado a nivel día, para modelar el monto total de ventas diarias.
+
+    Salida:
+        fecha
+        total_importe
+        num_lineas
+        num_ventas
+        anio, mes, dia_semana, es_fin_semana
+    """
+    ventas_dt = ventas.copy()
+    ventas_dt["fecha"] = pd.to_datetime(ventas_dt["fecha"], dayfirst=True, errors="coerce")
+
+    dv = detalle_ventas.merge(
+        ventas_dt[["id_venta", "fecha"]],
+        on="id_venta",
+        how="left",
+        validate="m:1"
+    )
+    dv = dv.dropna(subset=["fecha"])
+
+    daily = (
+        dv.groupby("fecha")
+          .agg(
+              total_importe=("importe", "sum"),
+              num_lineas=("id_producto", "count"),
+              num_ventas=("id_venta", "nunique"),
+          )
+          .reset_index()
+    )
+
+    daily["anio"] = daily["fecha"].dt.year
+    daily["mes"] = daily["fecha"].dt.month
+    daily["dia_semana"] = daily["fecha"].dt.weekday
+    daily["es_fin_semana"] = daily["dia_semana"].isin([5, 6]).astype(int)
+
+    return daily
+
 
 # --------------------------------------
 # Rutas relativas
@@ -117,7 +164,7 @@ st.sidebar.title("Navegación")
 
 sprint = st.sidebar.radio(
     "Sprint:",
-    ["SPRINT 1 — Fundamentos", "SPRINT 2 — Análisis"],
+    ["SPRINT 1 — Fundamentos", "SPRINT 2 — Análisis",  "SPRINT 3 — Modelo ML"],
     key="sprint_sel"
 )
 
@@ -140,6 +187,18 @@ elif "SPRINT 2" in sprint:
          ],   
         key="s2_sec"
     )
+    
+elif "SPRINT 3" in sprint:
+    section = st.sidebar.radio(
+        "Secciones SPRINT 3:",
+        [
+            "Diseño conceptual ML",
+            "Implementación y resultados ML",
+            "Resumen Sprint 3"
+        ],
+        key="s3_sec"
+    )
+
 
 
 
@@ -1551,3 +1610,257 @@ if section == "Resumen Sprint 2":
     st.markdown("---")
     st.markdown(html_resumen_sprint2, unsafe_allow_html=True)
 
+# ================================
+# SPRINT 3 
+# ================================
+''' elif "SPRINT 3" in sprint:
+    section = st.sidebar.radio(
+        "Secciones SPRINT 3:",
+        ["Diseño conceptual ML", "Implementación y resultados ML", "Resumen Sprint 3"],
+        key="s3_sec"
+    )'''
+   
+# ================================
+# SPRINT 3 — Diseño conceptual ML
+# ================================
+if section == "Diseño conceptual ML":
+    st.subheader("SPRINT 3 — Diseño conceptual del modelo ML")
+    st.caption("Trabajo en equipo — Definición del objetivo, algoritmo y variables.")
+
+    st.markdown(
+        """
+    ### 🎯 Objetivo del modelo
+
+    - **Tipo de problema:** regresión supervisada.  
+    - **Objetivo:** predecir el **monto total de ventas diarias** de la Tienda Aurelion
+      a partir del historial de ventas.
+
+    ### 🧠 Algoritmo elegido y justificación
+
+    - **Algoritmo:** Regresión Lineal Múltiple (`LinearRegression`, scikit-learn).
+    - **Justificación:**
+        - Es un modelo **simple, interpretable y estándar** para predicciones numéricas.
+        - Permite analizar el efecto de cada variable (mes, día de la semana, volumen de ventas)
+          sobre el monto diario.
+        - Es adecuado como **primer prototipo** de modelo ML dentro del proyecto.
+
+    ### 📥 Entradas (X) y 📤 Salida (y)
+
+    El modelo trabaja a nivel **día**. Para cada fecha del histórico se construyen:
+
+    - **Salida (y):**
+        - `total_importe`: suma del campo `importe` de `detalle_ventas` en ese día.
+
+    - **Entradas (X):**
+        - `anio`: año de la venta.
+        - `mes`: mes (1–12).
+        - `dia_semana`: día de la semana (0 = lunes ... 6 = domingo).
+        - `es_fin_semana`: indicador binario (1 si sábado/domingo, 0 en caso contrario).
+        - `num_lineas`: cantidad de ítems (filas de detalle) vendidos en ese día.
+        - `num_ventas`: cantidad de ventas distintas (`id_venta`) registradas en ese día.
+
+    ### 📏 Métricas de evaluación
+
+    Se utilizarán tres métricas principales:
+
+    - **MAE (Mean Absolute Error):** promedio del error absoluto en pesos.
+    - **RMSE (Root Mean Squared Error):** similar al MAE, pero penaliza más los errores grandes.
+    - **R² (coeficiente de determinación):** porcentaje de variabilidad del monto diario
+      explicado por el modelo (entre 0 y 1).
+        """
+    )
+
+
+# ================================
+# SPRINT 3 — Implementación y resultados ML
+# ================================
+if section == "Implementación y resultados ML":
+    st.subheader("SPRINT 3 — Implementación del modelo ML")
+    st.caption("Modelo de regresión para predecir el monto total de ventas diarias.")
+
+    # 1) Preparar dataset a nivel día
+    daily = preparar_dataset_ventas_diarias(ventas, detalle_ventas)
+
+    if len(daily) < 10:
+        st.warning("No hay suficientes días con ventas para entrenar un modelo robusto.")
+    else:
+        st.markdown("### 📅 Dataset agregado a nivel día")
+
+        st.dataframe(
+            daily[["fecha", "total_importe", "num_lineas", "num_ventas", "mes", "dia_semana", "es_fin_semana"]]
+            .head(10),
+            use_container_width=True
+        )
+
+        # 2) Definir X e y
+        X_cols = ["anio", "mes", "dia_semana", "es_fin_semana", "num_lineas", "num_ventas"]
+        X = daily[X_cols]
+        y = daily["total_importe"]
+
+        # 3) División train / test (80% - 20%)
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y,
+            test_size=0.20,  # 20% para test → 80% para train
+            random_state=42
+        )
+
+        st.markdown(
+            f"""
+        **División del conjunto de datos:**
+
+        - Entrenamiento: {len(X_train)} días  
+        - Test: {len(X_test)} días  
+        - Proporción aproximada: 80% / 20%
+            """
+        )
+
+        # 4) Entrenamiento del modelo
+        modelo = LinearRegression()
+        modelo.fit(X_train, y_train)
+
+        # 5) Predicciones
+        y_pred = modelo.predict(X_test)
+
+        # 6) Cálculo de métricas
+        mae = mean_absolute_error(y_test, y_pred)
+        mse = mean_squared_error(y_test, y_pred)
+        rmse = mse ** 0.5
+        r2 = r2_score(y_test, y_pred)
+
+        st.markdown("### 📏 Métricas de evaluación")
+
+        mcol1, mcol2, mcol3 = st.columns(3)
+        mcol1.metric("MAE (error medio absoluto)", f"${mae:,.0f}")
+        mcol2.metric("RMSE (raíz del error cuadrático)", f"${rmse:,.0f}")
+        mcol3.metric("R² (coeficiente de determinación)", f"{r2:.2f}")
+
+        st.caption(
+            "Un R² más cercano a 1 indica mejor ajuste del modelo. "
+            "Los valores de MAE y RMSE se interpretan directamente en pesos."
+        )
+
+        # 7) Tabla con resultados reales vs predichos
+        st.markdown("### 📋 Predicciones vs valores reales (conjunto de test)")
+
+        resultados = (
+            pd.DataFrame({
+                "fecha": daily.loc[y_test.index, "fecha"],
+                "real_total_importe": y_test,
+                "pred_total_importe": y_pred
+            })
+            .sort_values("fecha")
+        )
+
+        st.dataframe(
+            resultados.head(15),
+            use_container_width=True
+        )
+
+        # 8) Gráfico 1 — Real vs Predicho (scatter)
+        st.markdown("### 📈 Gráfico 1 — Ventas reales vs predichas")
+
+        fig1, ax1 = plt.subplots(figsize=(4.5, 3))
+        fig1.patch.set_alpha(0.0)
+        ax1.set_facecolor("none")
+
+        ax1.scatter(
+            resultados["real_total_importe"],
+            resultados["pred_total_importe"],
+            alpha=0.8,
+            s=20
+        )
+
+        # Diagonal perfecta y = x
+        min_val = min(resultados["real_total_importe"].min(), resultados["pred_total_importe"].min())
+        max_val = max(resultados["real_total_importe"].max(), resultados["pred_total_importe"].max())
+        ax1.plot([min_val, max_val], [min_val, max_val], linestyle="--")
+
+        ax1.set_xlabel("Ventas reales ($)", color="white", fontsize=9)
+        ax1.set_ylabel("Ventas predichas ($)", color="white", fontsize=9)
+        ax1.set_title("Dispersión real vs predicho", color="white", fontsize=10)
+        ax1.tick_params(colors="white", labelsize=8)
+        for spine in ax1.spines.values():
+            spine.set_color("white")
+
+        st.pyplot(fig1, transparent=True, use_container_width=False)
+
+        # 9) Gráfico 2 — Serie temporal (solo test)
+        st.markdown("### 📉 Gráfico 2 — Serie temporal en el conjunto de test")
+
+        fig2, ax2 = plt.subplots(figsize=(6, 3))
+        fig2.patch.set_alpha(0.0)
+        ax2.set_facecolor("none")
+
+        ax2.plot(resultados["fecha"], resultados["real_total_importe"], marker="o", label="Real")
+        ax2.plot(resultados["fecha"], resultados["pred_total_importe"], marker="x", label="Predicho")
+
+        ax2.set_xlabel("Fecha", color="white", fontsize=9)
+        ax2.set_ylabel("Total ventas diarias ($)", color="white", fontsize=9)
+        ax2.set_title("Comparación real vs predicho (días de test)", color="white", fontsize=10)
+        ax2.tick_params(colors="white", labelsize=8)
+        for spine in ax2.spines.values():
+            spine.set_color("white")
+        ax2.legend(facecolor="none", edgecolor="white", fontsize=8)
+
+        st.pyplot(fig2, transparent=True, use_container_width=True)
+
+        st.markdown(
+            """
+        **Interpretación general:**
+
+        - El modelo aprende una relación entre estacionalidad (mes, día de la semana)
+          y volumen de ventas (número de líneas y de ventas por día).
+        - La nube real vs predicho cercana a la diagonal indica que el modelo logra
+          una aproximación razonable del monto total de ventas diarias.
+        - Las desviaciones sobre la curva reflejan días atípicos (promociones,
+          compras muy grandes, etc.), donde el error aumenta.
+            """
+        )
+# ================================
+# SPRINT 3 — Resumen Sprint 3
+# ================================
+if section == "Resumen Sprint 3":
+    st.subheader("SPRINT 3 — Resumen del modelo de Machine Learning")
+    st.caption("Síntesis del diseño, implementación y resultados obtenidos.")
+
+    st.markdown(
+        """
+    ### 🧠 Diseño del modelo
+
+    - Se definió un problema de **regresión supervisada** para predecir el
+      **monto total de ventas diarias**.
+    - Se eligió el algoritmo de **Regresión Lineal Múltiple**, por su
+      simplicidad e interpretabilidad.
+    - Se construyó un dataset agregado a nivel día con variables derivadas
+      de la fecha y del volumen de operaciones.
+
+    ### ⚙️ Implementación
+
+    - Se preparó un dataset con:
+        - Entradas (X): `anio`, `mes`, `dia_semana`, `es_fin_semana`,
+          `num_lineas`, `num_ventas`.
+        - Salida (y): `total_importe` diario.
+    - Se realizó una división **train/test 80% / 20%**.
+    - Se entrenó el modelo con `LinearRegression` de scikit-learn.
+
+    ### 📏 Evaluación
+
+    - Se calcularon las métricas **MAE**, **RMSE** y **R²** sobre el
+      conjunto de test.
+    - Se compararon las ventas reales vs predichas mediante:
+        - Gráfico de dispersión real vs predicho.
+        - Serie temporal con ambas curvas superpuestas.
+
+    ### ✅ Conclusión
+
+    El modelo de regresión implementado constituye un primer acercamiento
+    para **estimar ventas futuras** en función de patrones temporales y
+    del volumen de operaciones diarias.  
+    A partir de este punto, se podrían explorar modelos más avanzados
+    (árboles de decisión, random forests o modelos específicos de
+    series temporales) para mejorar la precisión y capturar mejor la
+    estacionalidad del negocio.
+        """
+    )
+
+    
